@@ -124,9 +124,7 @@ class GLiNER2MLX:
         # Extract embeddings directly in MLX — no torch round-trip
         return self._extract_embeddings_mlx(token_embeddings, batch)
 
-    def _extract_embeddings_mlx(
-        self, token_embeddings: mx.array, batch
-    ) -> tuple[list[mx.array], list[list[mx.array]]]:
+    def _extract_embeddings_mlx(self, token_embeddings: mx.array, batch) -> tuple[list[mx.array], list[list[mx.array]]]:
         """Extract word and schema embeddings from encoder output using MLX.
 
         Uses precomputed gather indices (fast path) when available,
@@ -136,9 +134,7 @@ class GLiNER2MLX:
         all_schema_embs = []
         hidden = token_embeddings.shape[-1]
 
-        has_fast_indices = (
-            batch.text_word_indices is not None and batch.schema_special_indices is not None
-        )
+        has_fast_indices = batch.text_word_indices is not None and batch.schema_special_indices is not None
 
         if has_fast_indices:
             # Convert precomputed indices to MLX once
@@ -171,8 +167,7 @@ class GLiNER2MLX:
             )
             all_token_embs = [_torch_to_mlx(t) for t in all_token_embs_torch]
             all_schema_embs = [
-                [[_torch_to_mlx(e) for e in schema] for schema in sample]
-                for sample in all_schema_embs_torch
+                [[_torch_to_mlx(e) for e in schema] for schema in sample] for sample in all_schema_embs_torch
             ]
 
         return all_token_embs, all_schema_embs
@@ -377,22 +372,48 @@ class GLiNER2MLX:
 
         if schema_name == "entities":
             results[schema_name] = self._extract_entities(
-                field_names, span_scores, text_len, original_text,
-                start_mapping, end_mapping, threshold, metadata,
-                include_confidence, include_spans,
+                field_names,
+                span_scores,
+                text_len,
+                original_text,
+                start_mapping,
+                end_mapping,
+                threshold,
+                metadata,
+                include_confidence,
+                include_spans,
             )
         elif task_type == "relations":
             results[schema_name] = self._extract_relations(
-                schema_name, field_names, span_scores, pred_count,
-                text_len, original_text, start_mapping, end_mapping,
-                threshold, metadata, include_confidence, include_spans,
+                schema_name,
+                field_names,
+                span_scores,
+                pred_count,
+                text_len,
+                original_text,
+                start_mapping,
+                end_mapping,
+                threshold,
+                metadata,
+                include_confidence,
+                include_spans,
             )
         else:
             results[schema_name] = self._extract_structures(
-                schema_name, field_names, span_scores, pred_count,
-                text_len, text_tokens, original_text, start_mapping,
-                end_mapping, threshold, metadata, cls_fields,
-                include_confidence, include_spans,
+                schema_name,
+                field_names,
+                span_scores,
+                pred_count,
+                text_len,
+                text_tokens,
+                original_text,
+                start_mapping,
+                end_mapping,
+                threshold,
+                metadata,
+                cls_fields,
+                include_confidence,
+                include_spans,
             )
 
     # =========================================================================
@@ -485,7 +506,12 @@ class GLiNER2MLX:
                 if spans:
                     text_val, conf, char_start, char_end = spans[0]
                     if include_spans and include_confidence:
-                        entity_results[name] = {"text": text_val, "confidence": conf, "start": char_start, "end": char_end}
+                        entity_results[name] = {
+                            "text": text_val,
+                            "confidence": conf,
+                            "start": char_start,
+                            "end": char_end,
+                        }
                     elif include_spans:
                         entity_results[name] = {"text": text_val, "start": char_start, "end": char_end}
                     elif include_confidence:
@@ -543,15 +569,27 @@ class GLiNER2MLX:
                 if include_spans and include_confidence:
                     instances.append({"head": field_data[0], "tail": field_data[1]})
                 elif include_spans:
-                    instances.append({
-                        "head": {"text": field_data[0]["text"], "start": field_data[0]["start"], "end": field_data[0]["end"]},
-                        "tail": {"text": field_data[1]["text"], "start": field_data[1]["start"], "end": field_data[1]["end"]},
-                    })
+                    instances.append(
+                        {
+                            "head": {
+                                "text": field_data[0]["text"],
+                                "start": field_data[0]["start"],
+                                "end": field_data[0]["end"],
+                            },
+                            "tail": {
+                                "text": field_data[1]["text"],
+                                "start": field_data[1]["start"],
+                                "end": field_data[1]["end"],
+                            },
+                        }
+                    )
                 elif include_confidence:
-                    instances.append({
-                        "head": {"text": field_data[0]["text"], "confidence": field_data[0]["confidence"]},
-                        "tail": {"text": field_data[1]["text"], "confidence": field_data[1]["confidence"]},
-                    })
+                    instances.append(
+                        {
+                            "head": {"text": field_data[0]["text"], "confidence": field_data[0]["confidence"]},
+                            "tail": {"text": field_data[1]["text"], "confidence": field_data[1]["confidence"]},
+                        }
+                    )
                 else:
                     instances.append((values[0], values[1]))
 
@@ -642,7 +680,12 @@ class GLiNER2MLX:
                         if spans:
                             text_val, conf, char_start, char_end = spans[0]
                             if include_spans and include_confidence:
-                                instance[fname] = {"text": text_val, "confidence": conf, "start": char_start, "end": char_end}
+                                instance[fname] = {
+                                    "text": text_val,
+                                    "confidence": conf,
+                                    "start": char_start,
+                                    "end": char_end,
+                                }
                             elif include_spans:
                                 instance[fname] = {"text": text_val, "start": char_start, "end": char_end}
                             elif include_confidence:
