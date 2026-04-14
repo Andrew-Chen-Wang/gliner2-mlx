@@ -81,12 +81,12 @@ Measured on Apple M3 Max, `fastino/gliner2-base-v1`, 1000 iterations per scenari
 
 | Scenario | PyTorch CPU | MLX GPU | Speedup |
 |---|---|---|---|
-| Single entity extraction | 46.32 ms | 18.51 ms | **2.50x** |
-| Batch entity extraction (8 texts) | 115.62 ms | 34.11 ms | **3.39x** |
-| Long text entity extraction | 75.29 ms | 30.45 ms | **2.47x** |
-| Structure extraction | 46.06 ms | 25.12 ms | **1.83x** |
-| Relation extraction | 54.96 ms | 29.87 ms | **1.84x** |
-| **Overall** | **67.65 ms** | **27.61 ms** | **2.45x** |
+| Single entity extraction | 41.79 ms | 14.35 ms | **2.91x** |
+| Batch entity extraction (8 texts) | 106.19 ms | 35.41 ms | **3.00x** |
+| Long text entity extraction | 68.78 ms | 19.55 ms | **3.52x** |
+| Structure extraction | 41.60 ms | 14.24 ms | **2.92x** |
+| Relation extraction | 50.43 ms | 17.06 ms | **2.96x** |
+| **Overall** | **61.76 ms** | **20.12 ms** | **3.07x** |
 
 ## How It Works
 
