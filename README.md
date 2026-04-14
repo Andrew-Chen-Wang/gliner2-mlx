@@ -1,5 +1,7 @@
 # gliner2-mlx
 
+[![PyPI version](https://img.shields.io/pypi/v/gliner2-mlx)](https://pypi.org/project/gliner2-mlx/)
+
 An [MLX](https://github.com/ml-explore/mlx) port of [GLiNER2](https://github.com/fastino-ai/GLiNER2) for fast information extraction on Apple Silicon.
 
 GLiNER2 is a multi-task model for named entity recognition, text classification, relation extraction, and structured data extraction. This package runs the compute-heavy transformer encoder on MLX (Apple's GPU framework) while reusing GLiNER2's preprocessing and postprocessing, delivering significant speedups on Mac.
@@ -86,36 +88,6 @@ Measured on Apple M3 Max, `fastino/gliner2-base-v1`, 1000 iterations per scenari
 | Relation extraction | 54.96 ms | 29.87 ms | **1.84x** |
 | **Overall** | **67.65 ms** | **27.61 ms** | **2.45x** |
 
-Run the benchmark yourself:
-
-```bash
-uv sync --group bench
-uv run python benchmark_statistical.py --n 1000
-```
-
-## Development
-
-```bash
-git clone https://github.com/your-username/gliner2-mlx.git
-cd gliner2-mlx
-uv sync --group dev
-```
-
-Run tests:
-
-```bash
-uv run pytest                        # unit tests (fast)
-uv run pytest -m slow                # integration tests (downloads model)
-```
-
-Lint and format:
-
-```bash
-uv run ruff check src/ tests/        # lint
-uv run ruff format src/ tests/       # format
-uv run ty check src/                 # type check
-```
-
 ## How It Works
 
 gliner2-mlx ports the neural network inference to MLX while keeping GLiNER2 as a dependency for everything else:
@@ -124,6 +96,10 @@ gliner2-mlx ports the neural network inference to MLX while keeping GLiNER2 as a
 - **GLiNER2 (CPU):** Tokenization, schema processing, result formatting, overlap removal
 
 On first use, `from_pretrained` automatically converts PyTorch weights to MLX format and caches them in `~/.cache/gliner2-mlx/`.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, running tests, linting, benchmarking, and publishing instructions.
 
 ## License
 
