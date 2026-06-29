@@ -206,7 +206,9 @@ def convert_weights(
     logger.info(f"Loading weights from {model_file}")
     pt_weights = {}
     with safe_open(model_file, framework="numpy") as f:
-        for key in f:
+        # Iterate f.keys(): the safe_open handle is not directly iterable on
+        # safetensors >= 0.8 ("'builtins.safe_open' object is not iterable").
+        for key in f.keys():  # noqa: SIM118
             pt_weights[key] = f.get_tensor(key)
 
     # Remap keys and values
