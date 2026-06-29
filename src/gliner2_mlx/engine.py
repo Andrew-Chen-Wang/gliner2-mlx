@@ -52,6 +52,9 @@ class GLiNER2MLX:
                 and postprocessing only - its encoder weights are NOT used).
         """
         self.mlx_model = mlx_model
+        # Inference-only engine: put the MLX Extractor in eval mode so dropout
+        # (embeddings, attention probabilities, FFN) is disabled.
+        self.mlx_model.eval()
         self._gliner2 = gliner2_model
         self.processor = gliner2_model.processor
 
