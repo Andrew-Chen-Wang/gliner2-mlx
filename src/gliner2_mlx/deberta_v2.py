@@ -298,23 +298,29 @@ class DisentangledSelfAttention(nn.Module):
         # Slice rel_embeddings to [2*att_span, hidden_size] and add batch dim
         rel_embeddings = rel_embeddings[: att_span * 2, :][None, :, :]
 
+        # The position projections produce one (num_heads, ...) block; the content
+        # query/key layers are laid out batch-major, head-minor as (B*H, ...) by
+        # _transpose_for_scores, i.e. row b*H + h. We must broadcast the position
+        # block to the same ordering, so tile it B times -> [h0..h_{H-1}] repeated
+        # per batch. mx.repeat would instead interleave (h0,h0,...), pairing each
+        # row with the wrong head for batch_size > 1 and corrupting the bias.
         if self.share_att_key:
             pos_query_layer = self._transpose_for_scores(self.query_proj(rel_embeddings))
             pos_key_layer = self._transpose_for_scores(self.key_proj(rel_embeddings))
             repeat_count = query_layer.shape[0] // self.num_attention_heads
-            pos_query_layer = mx.repeat(pos_query_layer, repeat_count, axis=0)
-            pos_key_layer = mx.repeat(pos_key_layer, repeat_count, axis=0)
+            pos_query_layer = mx.tile(pos_query_layer, (repeat_count, 1, 1))
+            pos_key_layer = mx.tile(pos_key_layer, (repeat_count, 1, 1))
         else:
             pos_key_layer = None
             pos_query_layer = None
             if "c2p" in self.pos_att_type:
                 pos_key_layer = self._transpose_for_scores(self.pos_key_proj(rel_embeddings))
                 repeat_count = query_layer.shape[0] // self.num_attention_heads
-                pos_key_layer = mx.repeat(pos_key_layer, repeat_count, axis=0)
+                pos_key_layer = mx.tile(pos_key_layer, (repeat_count, 1, 1))
             if "p2c" in self.pos_att_type:
                 pos_query_layer = self._transpose_for_scores(self.pos_query_proj(rel_embeddings))
                 repeat_count = query_layer.shape[0] // self.num_attention_heads
-                pos_query_layer = mx.repeat(pos_query_layer, repeat_count, axis=0)
+                pos_query_layer = mx.tile(pos_query_layer, (repeat_count, 1, 1))
 
         score = 0
 

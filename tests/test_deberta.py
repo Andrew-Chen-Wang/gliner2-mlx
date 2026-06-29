@@ -132,6 +132,90 @@ class TestDebertaV2Model:
         assert mx.allclose(out1, out2, atol=1e-5)
 
 
+class TestBatchInvariance:
+    """Regression tests for the disentangled-bias ``mx.repeat`` -> ``mx.tile`` fix."""
+
+    def test_identical_rows_match_within_batch(self, small_deberta_config):
+        assert small_deberta_config.num_attention_heads >= 2
+        model = DebertaV2Model(small_deberta_config)
+        model.eval()
+
+        ids = mx.array([[5, 12, 7, 3, 9, 1, 4, 8]])
+        batch_ids = mx.concatenate([ids, ids], axis=0)
+        mask = mx.ones((2, ids.shape[1]))
+
+        out = model(batch_ids, mask)
+        mx.eval(out)
+        assert mx.allclose(out[0], out[1], atol=1e-5)
+
+    def test_batched_matches_per_sample(self, small_deberta_config):
+        model = DebertaV2Model(small_deberta_config)
+        model.eval()
+
+        ids0 = mx.array([[3, 1, 4, 1, 5, 9, 2, 6]])
+        ids1 = mx.array([[2, 7, 1, 8, 2, 8, 1, 8]])
+        batch = mx.concatenate([ids0, ids1], axis=0)
+        mask1 = mx.ones((1, 8))
+        mask2 = mx.ones((2, 8))
+
+        single0 = model(ids0, mask1)
+        single1 = model(ids1, mask1)
+        batched = model(batch, mask2)
+        mx.eval(single0, single1, batched)
+
+        assert mx.allclose(batched[0], single0[0], atol=1e-5)
+        assert mx.allclose(batched[1], single1[0], atol=1e-5)
+
+
+class TestEvalDropout:
+    """Regression test for inference-mode dropout."""
+
+    @staticmethod
+    def _config_with_dropout():
+        return DebertaV2Config(
+            vocab_size=100,
+            hidden_size=64,
+            num_hidden_layers=2,
+            num_attention_heads=2,
+            intermediate_size=128,
+            hidden_act="gelu",
+            hidden_dropout_prob=0.5,
+            attention_probs_dropout_prob=0.5,
+            max_position_embeddings=128,
+            type_vocab_size=0,
+            layer_norm_eps=1e-7,
+            relative_attention=True,
+            max_relative_positions=128,
+            position_biased_input=False,
+            pos_att_type=["c2p", "p2c"],
+            position_buckets=256,
+            norm_rel_ebd="layer_norm",
+            conv_kernel_size=0,
+        )
+
+    def test_train_mode_is_stochastic(self):
+        model = DebertaV2Model(self._config_with_dropout())
+        model.train()
+        ids = mx.array([[1, 2, 3, 4, 5, 6]])
+        mask = mx.ones((1, 6))
+
+        a = model(ids, mask)
+        b = model(ids, mask)
+        mx.eval(a, b)
+        assert not mx.allclose(a, b, atol=1e-5)
+
+    def test_eval_mode_is_deterministic(self):
+        model = DebertaV2Model(self._config_with_dropout())
+        model.eval()
+        ids = mx.array([[1, 2, 3, 4, 5, 6]])
+        mask = mx.ones((1, 6))
+
+        a = model(ids, mask)
+        b = model(ids, mask)
+        mx.eval(a, b)
+        assert mx.allclose(a, b, atol=1e-6)
+
+
 class TestDebertaV2Config:
     def test_from_dict(self):
         d = {
