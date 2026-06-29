@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 
 [[package]]
@@ -342,7 +342,7 @@ requires-dist = [
     { name = "huggingface-hub", specifier = ">=0.20.0" },
     { name = "mlx", specifier = ">=0.20.0" },
     { name = "numpy", specifier = ">=1.24.0" },
-    { name = "requests", specifier = ">=2.33.1" },
+    { name = "requests", specifier = ">=2.32.4" },
     { name = "safetensors", specifier = ">=0.4.0" },
     { name = "urllib3", specifier = ">=2.6.3" },
 ]
