@@ -59,7 +59,17 @@ class GLiNER2MLX:
         self.processor = gliner2_model.processor
 
     @classmethod
-    def from_pretrained(cls, repo_or_dir: str, **kwargs) -> "GLiNER2MLX":
+    def from_pretrained(
+        cls,
+        repo_or_dir: str,
+        *,
+        quantize: bool = False,
+        q_bits: int = 8,
+        q_group_size: int = 64,
+        quantize_embeddings: bool = True,
+        quantize_heads: bool = False,
+        **kwargs,
+    ) -> "GLiNER2MLX":
         """Load a pretrained GLiNER2 model with MLX inference.
 
         Downloads the model from HuggingFace Hub (or loads from local dir),
@@ -67,6 +77,20 @@ class GLiNER2MLX:
 
         Args:
             repo_or_dir: HuggingFace repo ID or local directory path.
+            quantize: If True, apply affine weight quantization to the MLX
+                model after loading full-precision weights (via ``mlx.nn``).
+            q_bits: Quantization bit width (e.g. 8 or 4). Start at 8 and drop
+                to 4 only if accuracy holds — a base encoder has less
+                redundancy than a large MoE.
+            q_group_size: Quantization group size. Layers whose last weight
+                dimension is not divisible by this value are skipped.
+            quantize_embeddings: If True, quantize eligible embedding tables
+                (the ~192M-param word embedding table is the single largest
+                memory/bandwidth win for this model).
+            quantize_heads: If True, also quantize the accuracy-sensitive task
+                heads (``span_rep``/``classifier``/``count_pred``/``count_embed``).
+                Off by default — these are tiny but feed directly into span
+                scores, so quantizing them is where F1 degrades first.
 
         Returns:
             GLiNER2MLX instance ready for inference.
@@ -98,14 +122,84 @@ class GLiNER2MLX:
             counting_layer=extractor_config.counting_layer,
         )
 
-        # Step 4: Load converted weights
+        # Step 4: Load converted (full-precision) weights.
+        #
+        # Order matters: load full-precision weights first, then quantize, then
+        # eval. ``mlx.nn.quantize`` derives quantized params from the currently
+        # loaded weights, so quantizing before loading would quantize the
+        # freshly-initialized (random) weights instead.
         logger.info("Loading MLX weights...")
         weights = _load_mlx_weights(weights_dir)
         mlx_model.load_weights(list(weights.items()))
+
+        # Step 5: Optionally apply affine weight quantization.
+        if quantize:
+            cls._quantize_model(
+                mlx_model,
+                q_bits=q_bits,
+                q_group_size=q_group_size,
+                quantize_embeddings=quantize_embeddings,
+                quantize_heads=quantize_heads,
+            )
+
         mx.eval(mlx_model.parameters())
 
         logger.info("GLiNER2MLX ready for inference.")
         return cls(mlx_model, gliner2_model)
+
+    @staticmethod
+    def _quantize_model(
+        mlx_model: Extractor,
+        *,
+        q_bits: int,
+        q_group_size: int,
+        quantize_embeddings: bool,
+        quantize_heads: bool,
+    ) -> None:
+        """Apply affine weight quantization to eligible layers in place.
+
+        Walks the module tree and quantizes ``Linear``/``Embedding`` layers
+        whose last weight dimension is divisible by ``q_group_size``. The task
+        heads are skipped by default because they feed directly into span/label
+        scores and are the first place F1 degrades under quantization.
+        """
+        import mlx.nn as nn
+
+        # Task heads that directly produce span/label scores: tiny (negligible
+        # bandwidth) but accuracy-sensitive, so skip them unless asked.
+        skip_prefixes = ("span_rep", "classifier", "count_pred", "count_embed")
+
+        def _predicate(path: str, module: nn.Module):
+            if not hasattr(module, "to_quantized"):
+                return False
+            # DeBERTa disentangled attention consumes rel_embeddings.weight as a
+            # raw matrix (get_rel_embedding -> LayerNorm -> matmul), bypassing the
+            # module's dequantizing __call__. Quantizing it packs the weight and
+            # breaks the forward pass, so always leave it full precision.
+            if path.endswith("rel_embeddings"):
+                return False
+            if not quantize_heads and path.startswith(skip_prefixes):
+                return False
+            if isinstance(module, nn.Embedding):
+                if not quantize_embeddings:
+                    return False
+                # embedding_dim must be group-size compatible
+                return module.weight.shape[-1] % q_group_size == 0
+            if isinstance(module, nn.Linear):
+                # in_features must be group-size compatible
+                return module.weight.shape[-1] % q_group_size == 0
+            return False
+
+        logger.info(
+            f"Quantizing MLX model (bits={q_bits}, group_size={q_group_size}, "
+            f"embeddings={quantize_embeddings}, heads={quantize_heads})..."
+        )
+        nn.quantize(
+            mlx_model,
+            group_size=q_group_size,
+            bits=q_bits,
+            class_predicate=_predicate,
+        )
 
     # =========================================================================
     # Core inference
