@@ -61,7 +61,7 @@ def sync_mlx():
 # ─── Models ──────────────────────────────────────────────────────
 
 
-def load_models(model_id):
+def load_models(model_id, quantize):
     """Load both PyTorch (CPU) and MLX models."""
     print("Loading PyTorch model (CPU)...", flush=True)
     from gliner2.inference.engine import GLiNER2
@@ -72,7 +72,7 @@ def load_models(model_id):
     print("Loading MLX model (GPU)...", flush=True)
     from gliner2_mlx import GLiNER2MLX
 
-    mlx_model = GLiNER2MLX.from_pretrained(model_id)
+    mlx_model = GLiNER2MLX.from_pretrained(model_id, quantize=quantize)
 
     return pt_model, mlx_model
 
@@ -246,6 +246,7 @@ def run_benchmark(pt_model, mlx_model, n_iter, n_warmup):
 def main():
     parser = argparse.ArgumentParser(description="Benchmark PyTorch CPU vs MLX GPU")
     parser.add_argument("--n", type=int, default=1000, help="Iterations per scenario")
+    parser.add_argument("--quantize", action="store_true", help="Quantize the MLX model")
     parser.add_argument("--warmup", type=int, default=10, help="Warmup iterations")
     parser.add_argument(
         "--model",
@@ -254,7 +255,7 @@ def main():
     )
     args = parser.parse_args()
 
-    pt_model, mlx_model = load_models(args.model)
+    pt_model, mlx_model = load_models(args.model, args.quantize)
     run_benchmark(pt_model, mlx_model, args.n, args.warmup)
 
 
